@@ -1,7 +1,7 @@
 # Intro to Robotics - MAC0318
 #
-# Name:
-# NUSP:
+# Name: Pedro Bortolli
+# NUSP: 9793721
 #
 # ---
 #
@@ -52,6 +52,10 @@ import duckievillage
 from duckievillage import DuckievillageEnv
 
 TRACKS = (('./maps/dense.yaml', 5), ('./maps/large.yaml', 15))
+
+DELTA = 0.585
+GAP = DELTA/4
+
 which = 0
 
 env = DuckievillageEnv(
@@ -65,11 +69,89 @@ env = DuckievillageEnv(
   cam_height = TRACKS[which][1]
 )
 
+# Set mark-mode whenever we run waypoints.py with the -m or --mark-waypoints flag.
+waypoints = duckievillage.Waypoints(env, '--read-from-file' in sys.argv)
+
 env.reset()
 env.render()
 
 # Use G to create the directed graph mentioned in the assignment task list.
 G = duckievillage.TopoGraph(env.road_tile_size)
+
+H = env.topo_graph
+for node in H.nodes():
+  up    = H.edge(node, (node[0], node[1] - DELTA))
+  down  = H.edge(node, (node[0], node[1] + DELTA))
+  left  = H.edge(node, (node[0] - DELTA, node[1]))
+  right = H.edge(node, (node[0] + DELTA, node[1]))
+
+  if int(up) + int(down) + int(left) + int(right) <= 2:
+    if up and down:
+      G.add_node((node[0] - GAP, node[1]))
+      G.add_node((node[0] + GAP, node[1]))
+    elif left and right:
+      G.add_node((node[0], node[1] - GAP))
+      G.add_node((node[0], node[1] + GAP))
+    elif (up and left) or (down and right):
+      G.add_node((node[0] - GAP, node[1] - GAP))
+      G.add_node((node[0] + GAP, node[1] + GAP))
+    elif (up and right) or (down and left):
+      G.add_node((node[0] - GAP, node[1] + GAP))
+      G.add_node((node[0] + GAP, node[1] - GAP))
+  else:
+    G.add_node(node)
+
+for node in H.nodes():
+  print(node)
+  up    = H.edge(node, (node[0], node[1] - DELTA))
+  down  = H.edge(node, (node[0], node[1] + DELTA))
+  left  = H.edge(node, (node[0] - DELTA, node[1]))
+  right = H.edge(node, (node[0] + DELTA, node[1]))
+
+  if int(up) + int(down) + int(left) + int(right) <= 2:
+    if up and down:
+      G.add_dir_edge((node[0] + GAP, node[1]),
+          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+      G.add_dir_edge((node[0] - GAP, node[1]),
+          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+    elif left and right:
+      G.add_dir_edge((node[0], node[1] + GAP),
+          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+      G.add_dir_edge((node[0], node[1] + GAP),
+          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+    elif up and left:
+      G.add_dir_edge((node[0] + GAP, node[1] + GAP),
+          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+      G.add_dir_edge((node[0] - GAP, node[1] - GAP),
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
+    elif up and right:
+      G.add_dir_edge((node[0] + GAP, node[1] - GAP),
+          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+      G.add_dir_edge((node[0] - GAP, node[1] + GAP),
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
+    elif down and left:
+      G.add_dir_edge((node[0] - GAP, node[1] + GAP),
+          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+      G.add_dir_edge((node[0] + GAP, node[1] - GAP),
+          G.closest_node((node[0] - 1.5 * DELTA, node[1] - GAP)))
+    elif down and right:
+      G.add_dir_edge((node[0] - GAP, node[1] - GAP),
+          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+      G.add_dir_edge((node[0] + GAP, node[1] + GAP),
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
+  else:
+    if up:
+      G.add_dir_edge(node,
+          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+    if down:
+      G.add_dir_edge(node,
+          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+    if left:
+      G.add_dir_edge(node,
+          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+    if right:
+      G.add_dir_edge(node,
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
 
 @env.unwrapped.window.event
 def on_key_press(symbol, modifiers):
@@ -89,7 +171,9 @@ def on_mouse_press(x, y, button, mods):
     # The function below calls BFS from the bot's current position to your mouse's position,
     # returning a list of positions to go to.
     Q = env.topo_graph.bfs(env.get_position(), (px, py))
-    print(Q, len(Q))
+
+    for i in range(len(Q)):
+      waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
 
     # Once you implement your new digraph, you should be able to call BFS in the following way:
     # Q = G.bfs(env.get_position(), (px, py))

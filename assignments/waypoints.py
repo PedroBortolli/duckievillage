@@ -1,7 +1,7 @@
 # Intro to Robotics - MAC0318
 #
-# Name:
-# NUSP:
+# Name: Pedro Bortolli
+# NUSP: 9793721
 #
 # ---
 #
@@ -35,6 +35,7 @@
 #  4. Submit your work to PACA.
 
 import sys
+import math
 import pyglet
 from pyglet.window import key
 from pyglet.window import mouse
@@ -43,6 +44,13 @@ import gym
 import gym_duckietown
 import duckievillage
 from duckievillage import DuckievillageEnv
+
+# Threshold for angle and distance
+EPS_ANGLE = 1e-2
+EPS_DIST = 0.5
+
+# Keeps reference to the next goal
+next_point = None
 
 env = DuckievillageEnv(
   seed = 101,
@@ -80,11 +88,54 @@ def on_mouse_press(x, y, button, mods):
 key_handler = key.KeyStateHandler()
 env.unwrapped.window.push_handlers(key_handler)
 
+def arrived(dist):
+  """Check if car arrived at destination"""
+  return abs(dist[0]) + abs(dist[1]) < EPS_DIST
+
+def get_angle(current, goal):
+  """Find minnimum angle between two vectors"""
+  dot = np.dot(current, goal)
+  nc = np.linalg.norm(current)
+  ng = np.linalg.norm(goal)
+  cos = dot / (nc * ng)
+  angle = math.acos(cos)
+  return angle
+
 def update(dt):
+
   action = [0.0, 0.0]
 
   # This is where you'll write the Duckie's logic.
   # You can fetch your duckiebot's position with env.get_position().
+
+  # Get next waypoint (if any)
+  global next_point
+  if not next_point:
+    next_point = waypoints.next()
+
+  print(next_point)
+  if next_point:
+    # Current direction vector and goal distance vector
+    current = env.get_dir_vec()[0::2]
+    goal = next_point - env.get_position()
+
+    # Checks whether the current goal was reached or not
+    if arrived(goal):
+      next_point = None
+
+    else:
+      angle = get_angle(current, goal)
+      if angle > EPS_ANGLE:
+        # Find if we should turn left or right
+        cross = np.cross(current, goal)
+        sign = -np.sign(cross)
+
+        # Reduce angle by turning car towards goal vector
+        action[1] = 2 * angle * sign
+
+      else:
+        # Just move the car forwards
+        action[0] = 1.0
 
   obs, reward, done, info = env.step(action)
 

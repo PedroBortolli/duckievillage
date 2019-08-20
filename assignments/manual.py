@@ -1,7 +1,7 @@
 # Intro to Robotics - MAC0318
 #
-# Name:
-# NUSP:
+# Name: Pedro Bortolli
+# NUSP: 9793721
 #
 # ---
 #
@@ -34,6 +34,10 @@ from pyglet.window import key
 import gym
 import gym_duckietown
 from duckievillage import DuckievillageEnv
+
+# Constants for movement
+SPEED = 1.0
+ROTATION = 6.0
 
 # We'll use our version of Duckietown: Duckievillage. This environment will be where we'll run most
 # our tasks in.
@@ -76,14 +80,18 @@ def update(dt):
 
   # The key_handler object handles keyboard events. It's basically a map indexed by Pyglet keys
   # with values True if the key is being held, or False otherwise.
-  if key_handler[key.D]:
-    print('D!')
-  if key_handler[key.U]:
-    print('U!')
-  if key_handler[key.C]:
-    print('C!')
-  if key_handler[key.K]:
-    print('K!')
+  if key_handler[key.W] or key_handler[key.UP]:
+    action[0] += SPEED
+  if key_handler[key.A] or key_handler[key.LEFT]:
+    action[1] += ROTATION
+  if key_handler[key.S] or key_handler[key.DOWN]:
+    action[0] -= SPEED
+  if key_handler[key.D] or key_handler[key.RIGHT]:
+    action[1] -= ROTATION
+
+  # Try to turn at the same angular velocity both moving or not
+  if not action[0]:
+    action[1] /= 4
 
   # At each step, the environment may (or may not) change given your actions. Function step takes
   # as parameter the array action and returns an observation (what the robot is currently
