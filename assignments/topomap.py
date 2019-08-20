@@ -42,6 +42,7 @@
 #  4. Submit your work to PACA.
 
 import sys
+import math
 import pyglet
 from pyglet.window import key
 from pyglet.window import mouse
@@ -53,8 +54,22 @@ from duckievillage import DuckievillageEnv
 
 TRACKS = (('./maps/dense.yaml', 5), ('./maps/large.yaml', 15))
 
+# Constants to set grid positions
 DELTA = 0.585
 GAP = DELTA/4
+
+# Threshold for angle and distance
+EPS_ANGLE = 1e-2
+EPS_DIST = 1e-1
+
+# Keeps reference to the next goal
+next_point = None
+
+# Keeps reference to last goal
+last_goal = None
+
+# Decide if the entire path has been already travelled
+finished = False
 
 which = 0
 
@@ -101,8 +116,10 @@ for node in H.nodes():
   else:
     G.add_node(node)
 
+# for node in G.nodes():
+#  waypoints.mark(node[0], node[1], node[0], node[1])
+
 for node in H.nodes():
-  print(node)
   up    = H.edge(node, (node[0], node[1] - DELTA))
   down  = H.edge(node, (node[0], node[1] + DELTA))
   left  = H.edge(node, (node[0] - DELTA, node[1]))
@@ -163,6 +180,7 @@ def on_key_press(symbol, modifiers):
 # On mouse press, register waypoint.
 @env.unwrapped.window.event
 def on_mouse_press(x, y, button, mods):
+  global last_goal
   if button == mouse.LEFT:
     if x < 0 or x > duckievillage.WINDOW_WIDTH or y < 0 or y > duckievillage.WINDOW_HEIGHT:
       return
@@ -171,25 +189,80 @@ def on_mouse_press(x, y, button, mods):
     # The function below calls BFS from the bot's current position to your mouse's position,
     # returning a list of positions to go to.
     Q = env.topo_graph.bfs(env.get_position(), (px, py))
+    Q.reverse()
 
     for i in range(len(Q)):
       waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
+      if i+1 == len(Q):
+        last_goal = Q[i]
 
     # Once you implement your new digraph, you should be able to call BFS in the following way:
     # Q = G.bfs(env.get_position(), (px, py))
 
+
+
 key_handler = key.KeyStateHandler()
 env.unwrapped.window.push_handlers(key_handler)
 
+
+
+def arrived(dist):
+  """Check if car arrived at destination"""
+  return abs(dist[0]) + abs(dist[1]) < EPS_DIST
+
+def get_angle(current, goal):
+  """Find minnimum angle between two vectors"""
+  dot = np.dot(current, goal)
+  nc = np.linalg.norm(current)
+  ng = np.linalg.norm(goal)
+  cos = dot / (nc * ng)
+  angle = math.acos(cos)
+  return angle
+
+
 def update(dt):
+  global next_point, finished
+
+  # If the final destination has been achieved don't do anything else
+  if finished:
+    return
+
   action = [0.0, 0.0]
 
-  # This is where you'll write the Duckie's logic.
-  # You can fetch your duckiebot's position with env.get_position().
+  # Get next waypoint (if any)
+  if not next_point:
+    next_point = waypoints.next()
+
+  if next_point:
+    # Current direction vector and goal distance vector
+    current = env.get_dir_vec()[0::2]
+    goal = next_point - env.get_position()
+
+    # Checks whether the current goal was reached or not
+    if arrived(goal):
+      if next_point == last_goal:
+        finished = True
+      next_point = None
+
+    else:
+      angle = get_angle(current, goal)
+      if angle > EPS_ANGLE:
+        # Find if we should turn left or right
+        cross = np.cross(current, goal)
+        sign = -np.sign(cross)
+
+        # Reduce angle by turning car towards goal vector
+        action[1] = 3 * angle * sign
+
+      else:
+        # Just move the car forwards
+        action[0] = 1.0
 
   obs, reward, done, info = env.step(action)
-
   env.render()
+
+
+
 
 pyglet.clock.schedule_interval(update, 1.0 / env.unwrapped.frame_rate)
 
