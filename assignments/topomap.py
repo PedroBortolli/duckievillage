@@ -3,6 +3,9 @@
 # Name: Pedro Bortolli
 # NUSP: 9793721
 #
+# Name: Marcelo Trylesinski
+# NUSP: 9297996
+#
 # ---
 #
 # Assignment 3 - Topological maps
@@ -116,8 +119,6 @@ for node in H.nodes():
   else:
     G.add_node(node)
 
-# for node in G.nodes():
-#  waypoints.mark(node[0], node[1], node[0], node[1])
 
 for node in H.nodes():
   up    = H.edge(node, (node[0], node[1] - DELTA))
@@ -125,6 +126,7 @@ for node in H.nodes():
   left  = H.edge(node, (node[0] - DELTA, node[1]))
   right = H.edge(node, (node[0] + DELTA, node[1]))
 
+  # Build directed edges
   if int(up) + int(down) + int(left) + int(right) <= 2:
     if up and down:
       G.add_dir_edge((node[0] + GAP, node[1]),
@@ -133,14 +135,14 @@ for node in H.nodes():
           G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
     elif left and right:
       G.add_dir_edge((node[0], node[1] - GAP),
-          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+          G.closest_node((node[0] - 1.5 * DELTA, node[1] - GAP)))
       G.add_dir_edge((node[0], node[1] + GAP),
           G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
     elif up and left:
       G.add_dir_edge((node[0] + GAP, node[1] + GAP),
-          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+          G.closest_node((node[0] + GAP, node[1] + 1.5 * DELTA)))
       G.add_dir_edge((node[0] - GAP, node[1] - GAP),
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
     elif up and right:
       G.add_dir_edge((node[0] + GAP, node[1] - GAP),
           G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
@@ -160,15 +162,23 @@ for node in H.nodes():
     if up:
       G.add_dir_edge(node,
           G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+      G.add_dir_edge(G.closest_node((node[0] - GAP, node[1] - 1.5 * DELTA)),
+          node)
     if down:
       G.add_dir_edge(node,
           G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+      G.add_dir_edge(G.closest_node((node[0] + GAP, node[1] + 1.5 * DELTA)),
+          node)
     if left:
       G.add_dir_edge(node,
           G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+      G.add_dir_edge(G.closest_node((node[0] - 1.5 * DELTA, node[1] - GAP)),
+          node)
     if right:
       G.add_dir_edge(node,
           G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
+      G.add_dir_edge(G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)),
+          node)
 
 
 @env.unwrapped.window.event
@@ -194,7 +204,9 @@ def on_mouse_press(x, y, button, mods):
 
     # Once you implement your new digraph, you should be able to call BFS in the following way:
     Q = G.bfs(env.get_position(), (px, py))
+    print("Points to travel: ", Q)
     if Q is not None:
+      Q.reverse()
       for i in range(len(Q)):
         waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
         if i+1 == len(Q):
