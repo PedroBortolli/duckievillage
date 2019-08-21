@@ -192,13 +192,13 @@ def on_mouse_press(x, y, button, mods):
     Q = env.topo_graph.bfs(env.get_position(), (px, py))
     Q.reverse()
 
-    for i in range(len(Q)):
-      waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
-      if i+1 == len(Q):
-        last_goal = Q[i]
-
     # Once you implement your new digraph, you should be able to call BFS in the following way:
-    # Q = G.bfs(env.get_position(), (px, py))
+    Q = G.bfs(env.get_position(), (px, py))
+    if Q is not None:
+      for i in range(len(Q)):
+        waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
+        if i+1 == len(Q):
+          last_goal = Q[i]
 
 
 
