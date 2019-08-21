@@ -132,10 +132,10 @@ for node in H.nodes():
       G.add_dir_edge((node[0] - GAP, node[1]),
           G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
     elif left and right:
-      G.add_dir_edge((node[0], node[1] + GAP),
+      G.add_dir_edge((node[0], node[1] - GAP),
           G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
       G.add_dir_edge((node[0], node[1] + GAP),
-          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
     elif up and left:
       G.add_dir_edge((node[0] + GAP, node[1] + GAP),
           G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
@@ -169,6 +169,7 @@ for node in H.nodes():
     if right:
       G.add_dir_edge(node,
           G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
+
 
 @env.unwrapped.window.event
 def on_key_press(symbol, modifiers):
