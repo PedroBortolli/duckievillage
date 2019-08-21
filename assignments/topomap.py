@@ -94,11 +94,29 @@ env.render()
 G = duckievillage.TopoGraph(env.road_tile_size)
 
 H = env.topo_graph
-for node in H.nodes():
+
+first_node = H.closest_node(env.get_position())
+first_direction = 'up'
+queue = []
+seen = dict()
+queue.append((first_node, first_direction))
+
+
+
+def get_neighbors(node):
   up    = H.edge(node, (node[0], node[1] - DELTA))
   down  = H.edge(node, (node[0], node[1] + DELTA))
   left  = H.edge(node, (node[0] - DELTA, node[1]))
   right = H.edge(node, (node[0] + DELTA, node[1]))
+  return up, down, left, right
+
+
+#waypoints.mark(3.2175, 0.14625, 3.2175, 0.14625)
+
+
+
+for node in H.nodes():
+  up, down, left, right = get_neighbors(node)
 
   if int(up) + int(down) + int(left) + int(right) <= 2:
     if up and down:
@@ -116,60 +134,98 @@ for node in H.nodes():
   else:
     G.add_node(node)
 
-# for node in G.nodes():
-#  waypoints.mark(node[0], node[1], node[0], node[1])
 
-for node in H.nodes():
-  up    = H.edge(node, (node[0], node[1] - DELTA))
-  down  = H.edge(node, (node[0], node[1] + DELTA))
-  left  = H.edge(node, (node[0] - DELTA, node[1]))
-  right = H.edge(node, (node[0] + DELTA, node[1]))
+while len(queue) > 0:
+  node, direction = queue.pop(0)
+  seen[(node, direction)] = True
+  up, down, left, right = get_neighbors(node)
 
+  print(node, direction, "    ( ", up, down, left, right, ")")
+  
   if int(up) + int(down) + int(left) + int(right) <= 2:
-    if up and down:
-      G.add_dir_edge((node[0] + GAP, node[1]),
-          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
-      G.add_dir_edge((node[0] - GAP, node[1]),
-          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
-    elif left and right:
-      G.add_dir_edge((node[0], node[1] - GAP),
-          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
-      G.add_dir_edge((node[0], node[1] + GAP),
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
-    elif up and left:
-      G.add_dir_edge((node[0] + GAP, node[1] + GAP),
-          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
-      G.add_dir_edge((node[0] - GAP, node[1] - GAP),
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
-    elif up and right:
-      G.add_dir_edge((node[0] + GAP, node[1] - GAP),
-          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
-      G.add_dir_edge((node[0] - GAP, node[1] + GAP),
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
-    elif down and left:
-      G.add_dir_edge((node[0] - GAP, node[1] + GAP),
-          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
-      G.add_dir_edge((node[0] + GAP, node[1] - GAP),
-          G.closest_node((node[0] - 1.5 * DELTA, node[1] - GAP)))
-    elif down and right:
-      G.add_dir_edge((node[0] - GAP, node[1] - GAP),
-          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
-      G.add_dir_edge((node[0] + GAP, node[1] + GAP),
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] + GAP)))
+    if direction == 'up':
+      if up:
+        next_node = (node[0] + GAP, node[1] - DELTA)
+        G.add_dir_edge((node[0] + GAP, node[1]), next_node)
+        if (next_node, 'up') not in seen:
+          queue.append(((node[0], node[1] - DELTA), 'up'))
+
+      if left:
+        next_node = (node[0] - DELTA, node[1] - GAP)
+        G.add_dir_edge((node[0] + GAP, node[1] - GAP), next_node)
+        if (next_node, 'left') not in seen:
+          queue.append(((node[0], node[1]), 'left'))
+
+      if right:
+        next_node = (node[0] + DELTA, node[1] + GAP - DELTA)
+        G.add_dir_edge((node[0] + GAP, node[1]), next_node)
+        if (next_node, 'right') not in seen:
+          queue.append(((node[0], node[1]), 'right'))
+
+    elif direction == 'left':
+      if up:
+        next_node = (node[0] - DELTA + GAP, node[1] - DELTA)
+        G.add_dir_edge((node[0], node[1] - GAP), next_node)
+        if (next_node, 'up') not in seen:
+          queue.append(((node[0], node[1]), 'up'))
+      if left:
+        next_node = (node[0] - DELTA, node[1] - GAP)
+        G.add_dir_edge((node[0], node[1] - GAP), next_node)
+        if (next_node, 'left') not in seen:
+          queue.append(((node[0] - DELTA, node[1]), 'left'))
+      if down:
+        next_node = (node[0] - DELTA - GAP, node[1] + DELTA)
+        G.add_dir_edge((node[0] - GAP, node[1] - GAP), next_node)
+        if (next_node, 'down') not in seen:
+          queue.append(((node[0], node[1]), 'down'))
+
+    elif direction == 'right':
+      if up:
+        next_node = (node[0] + DELTA + GAP, node[1] - DELTA)
+        G.add_dir_edge((node[0], node[1] + GAP), next_node)
+        if (next_node, 'up') not in seen:
+          queue.append(((node[0], node[1]), 'up'))
+      if right:
+        next_node = (node[0] + DELTA, node[1] + GAP)
+        G.add_dir_edge((node[0], node[1] + GAP), next_node)
+        if (next_node, 'right') not in seen:
+          queue.append(((node[0] + DELTA, node[1]), 'right'))
+      if down:
+        next_node = (node[0] + DELTA - GAP, node[1] + DELTA)
+        G.add_dir_edge((node[0], node[1] + GAP), next_node)
+        if (next_node, 'down') not in seen:
+          queue.append(((node[0], node[1]), 'down'))
+
+    elif direction == 'down':
+      if down:
+        next_node = (node[0] - GAP, node[1] + DELTA)
+        G.add_dir_edge((node[0] - GAP, node[1]), next_node)
+        if (next_node, 'down') not in seen:
+          queue.append(((node[0], node[1] + DELTA), 'down'))
+      if right:
+        next_node = (node[0] + DELTA, node[1] + DELTA - GAP)
+        G.add_dir_edge((node[0] - GAP, node[1]), next_node)
+        if (next_node, 'right') not in seen:
+          queue.append(((node[0], node[1]), 'right'))
+      if left:
+        next_node = (node[0] - DELTA, node[1] + DELTA - GAP)
+        G.add_dir_edge((node[0] - GAP, node[1] - GAP), next_node)
+        if (next_node, 'left') not in seen:
+          queue.append(((node[0], node[1]), 'left'))
+
   else:
     if up:
-      G.add_dir_edge(node,
-          G.closest_node((node[0] + GAP, node[1] - 1.5 * DELTA)))
+      G.add_dir_edge(node, (node[0] + GAP, node[1] - DELTA))
+      queue.append(((node[0], node[1] - DELTA), 'up'))
     if down:
-      G.add_dir_edge(node,
-          G.closest_node((node[0] - GAP, node[1] + 1.5 * DELTA)))
+      G.add_dir_edge(node, (node[0] - GAP, node[1] + DELTA))
+      queue.append(((node[0], node[1] + DELTA), 'down'))
     if left:
-      G.add_dir_edge(node,
-          G.closest_node((node[0] - 1.5 * DELTA, node[1] + GAP)))
+      G.add_dir_edge(node, (node[0] - DELTA, node[1] - GAP))
+      queue.append(((node[0] - DELTA, node[1]), 'left'))
     if right:
-      G.add_dir_edge(node,
-          G.closest_node((node[0] + 1.5 * DELTA, node[1] - GAP)))
-
+      G.add_dir_edge(node, (node[0] + DELTA, node[1] + GAP))
+      queue.append(((node[0] + DELTA, node[1]), 'right'))
 
 @env.unwrapped.window.event
 def on_key_press(symbol, modifiers):
@@ -189,6 +245,7 @@ def on_mouse_press(x, y, button, mods):
     px, py = env.convert_coords(x, y)
     # The function below calls BFS from the bot's current position to your mouse's position,
     # returning a list of positions to go to.
+    """
     Q = env.topo_graph.bfs(env.get_position(), (px, py))
     Q.reverse()
 
@@ -196,9 +253,18 @@ def on_mouse_press(x, y, button, mods):
       waypoints.mark(Q[i][0], Q[i][1], Q[i][0], Q[i][1])
       if i+1 == len(Q):
         last_goal = Q[i]
+    """
 
     # Once you implement your new digraph, you should be able to call BFS in the following way:
-    # Q = G.bfs(env.get_position(), (px, py))
+    Q = G.bfs(env.get_position(), (px, py))
+    print("\nDepois de chamar bfs:\n")
+    print(Q)
+
+    """adj = G.adj()
+    for lala in adj:
+      for lul in adj[lala]:
+        print(lala, " -> ", lul)
+      print("\n")"""
 
 
 
