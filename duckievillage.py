@@ -285,7 +285,7 @@ class PolygonMap:
 
   def add(self, obj):
     # Transform coordinates back to Duckietown.
-    p = (obj.obj_corners - ((2*self._env.road_tile_size/3), 0))/(2,1)
+    p = obj.obj_corners/(2,1)
     # Append Duckietown coordinates.
     self._polys = np.append(self._polys, [obj.obj_corners], axis=0)
     # Convert to window coordinates.
@@ -339,6 +339,62 @@ class PolygonMap:
 FULL_VIEW_MODE = 0
 TOP_DOWN_VIEW_MODE = 1
 FRONT_VIEW_MODE = 2
+N_VIEW_MODES = 3
+
+# A virtual odometer with a certain error rate.
+class Odometer:
+  def __init__(self, sigma_theta = 0.1, sigma_dist = 0.01):
+    self._dist = 0
+    self._theta = 0
+    self._sigma_theta = sigma_theta
+    self._sigma_dist = sigma_dist
+
+  # Update odometer and applies some gaussian error to values.
+  def update(self, wl, wr, r):
+    self._theta += wl - wr + np.random.normal(0, self._sigma_theta)
+    self._dist += ((wl + wr)*r)/2 + np.random.normal(0, self._sigma_dist)
+
+  def measure(self):
+    from math import fmod, pi
+    t, d = fmod(self._theta, 360), self._dist
+    if t < 0:
+      t += 360
+    if d < 0:
+      d = 0
+    self.reset()
+    return d, t
+
+  # Resets the odometer.
+  def reset(self):
+    self._theta = 0
+    self._dist = 0
+
+# This is a mock-up of a road tile sensor. It detects the road type of the current tile (straight,
+# curve or intersection) and applies some error to make it more realistic.
+class RoadSensor:
+  KINDS = {'straight': 0, 'curve_left': 1, 'curve_right': 1, '4way': 2, '3way_left': 2,
+           '3way_right': 2}
+
+  def __init__(self, env, error_mu = 0.7, error_sigma = 0.4):
+    self._env = env
+    self._error_mu = error_mu
+    self._error_sigma = error_sigma
+
+    self._cm = ((0.7, 0.1, 0.2),
+                (0.1, 0.8, 0.1),
+                (0.2, 0.1, 0.7))
+
+  # Predicts the current tile and applies an error to it. Returns None if could not
+  # recognize terrain (i.e. agent is not standing on a road tile). Returns 0 if straight, 1 if
+  # curve and 2 if intersection.
+  def predict(self):
+    for t in self._env.drivable_tiles:
+      if t['coords'] == self._env.current_tile():
+        from numpy.random import choice
+        c = choice(3, p=self._cm[RoadSensor.KINDS[t['kind']]])
+        # Returns
+        return c
+    return None
 
 class DuckievillageEnv(gym_duckietown.envs.DuckietownEnv):
   top_down = False
@@ -358,11 +414,32 @@ class DuckievillageEnv(gym_duckietown.envs.DuckietownEnv):
     self._view_mode = 0
     self.top_cam_height = cam_height
 
+    self.odometer = Odometer()
+    self.road_sensor = RoadSensor(self)
+
+    self._roads = []
+    for t in self.drivable_tiles:
+      k = t['kind'].split('_', 1)[0]
+      if k == '3way' or k == '4way':
+        k = 'inter'
+      self._roads.append((t['coords'], k))
+
   def next_view(self):
-    self._view_mode = (self._view_mode + 1) % 3
+    self._view_mode = (self._view_mode + 1) % N_VIEW_MODES
 
   def set_view(self, view):
-    self._view_mode = view % 3
+    self._view_mode = view % N_VIEW_MODES
+
+  def toggle_single_view(self):
+    if self._view_mode == TOP_DOWN_VIEW_MODE:
+      self._view_mode = FRONT_VIEW_MODE
+    else:
+      self._view_mode = TOP_DOWN_VIEW_MODE
+
+  # Returns a list with all road tiles in the current map. Each item of the list contains the
+  # tile indices (not positional coordinates), and the tile type (curve, straight, intersection).
+  def roads(self):
+    return self._roads
 
   def render_obs(self):
     obs = self._render_img(
@@ -669,7 +746,7 @@ class DuckievillageEnv(gym_duckietown.envs.DuckietownEnv):
     if self._view_mode == FULL_VIEW_MODE:
       img = np.concatenate((top, bot), axis=1)
       win_width = 2*WINDOW_WIDTH
-    elif self._view_mode == FRONT_VIEW_MODE:
+    elif self._view_mode == TOP_DOWN_VIEW_MODE:
       img = top
     else:
       img = bot
@@ -745,6 +822,12 @@ class DuckievillageEnv(gym_duckietown.envs.DuckietownEnv):
   def reset(self, force=False):
     if force:
       self.force_reset()
+
+  def step(self, action):
+    obs, reward, done, info = gym_duckietown.envs.DuckietownEnv.step(self, action)
+    metrics = info['DuckietownEnv']
+    self.odometer.update(metrics['omega_l'], metrics['omega_r'], metrics['radius'])
+    return obs, reward, done, info
 
   def force_reset(self):
     gym_duckietown.envs.DuckietownEnv.reset(self)
